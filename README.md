@@ -1,3 +1,30 @@
+WARNING
+========
+Experimental in-progress work.  PROVIDED "AS IS", WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, see GNU General Public License, version 2
+for detailed disclaimer:
+https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+Use at your own risk, In the best case you will lose time/work and/or
+corrupt your files.
+
+xah-fly-keys-hyper
+===================
+This is an attempt to rewrite xah-fly-keys to model the command mode state as
+a sticky Hyper key.  This makes it easier to define custom key bindings that
+depend on xah-fly's command mode state.
+
+E.g.  to create a binding for the command-mode state that is only active in
+VHDL mode, we can now add a key binding like
+
+```
+  (define-key vhdl-mode-map (kbd "H-SPC v h p") 'vhdl-port-paste-instance)
+```
+
+(where "H-" denotes the hyper modifier that is only present in command mode)
+
+Note how this is similar in spirit to Chris Done's god-mode.el .
+
 xah-fly-keys
 ===================
 

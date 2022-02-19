@@ -1,14 +1,31 @@
-;;; xah-fly-keys.el --- ergonomic modal keybinding minor mode. -*- coding: utf-8; lexical-binding: t; -*-
+;;; xah-fly-keys.el --- Experimental ergonomic modal keybinding minor mode. -*- coding: utf-8; lexical-binding: t; -*-
+
+;;;  This program is free software; you can redistribute it and/or modify
+;;;  it under the terms of the GNU General Public License as published by
+;;;  the Free Software Foundation; version 2 of the License.
+
+;;;  This program is distributed in the hope that it will be useful,
+;;;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;;  GNU General Public License for more details:
+
+;;;  https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+;;; WARNING: Experimental in-progress work.  PROVIDED "AS IS", WITHOUT
+;;; WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, see license for detailed
+;;; disclaimer.  Use at your own risk, in the best case you will lose
+;;; time/work and/or corrupt your files.
 
 ;; Copyright © 2013-2022 by Xah Lee
+;; Modifications Copyright (c) David Kuehling 2022
+;; For Xah Lee's original version, see http://xahlee.info/emacs/misc/xah-fly-keys.html
 
-;; Author: Xah Lee ( http://xahlee.info/ )
-;; Version: 16.13.20220216220117
+;; Author: Xah Lee ( http://xahlee.info/ ) (among others)
 ;; Created: 10 Sep 2013
 ;; Package-Requires: ((emacs "24.1"))
 ;; Keywords: convenience, emulations, vim, ergoemacs
 ;; License: GPL v2. Tell your friends to buy a copy.
-;; Homepage: http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html
+;; Homepage: 
 
 ;; This file is not part of GNU Emacs.
 
@@ -17,6 +34,16 @@
 ;; xah-fly-keys is a efficient keybinding for emacs. (more efficient than vim)
 
 ;; It is a modal mode like vi, but key choices are based on statistics of command call frequency.
+
+;; This is an experimantal rewrite of the engine, attempting to model
+;; command-mode state as a sticky Hyper key, thereby allowing mode-maps to
+;; add command-mode bindings merely by defining bindings that include the
+;; Hyper modifier.
+
+;; WARNING: Experimental in-progress work.  PROVIDED "AS IS", WITHOUT
+;; WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, see license for detailed
+;; disclaimer.  Use at your own risk, in the best case you will lose
+;; time/work and/or corrupt your files.
 
 ;; --------------------------------------------------
 ;; MANUAL INSTALL
@@ -3571,19 +3598,23 @@ Version: 2020-04-18"
                ,(list 'quote (cdr $pair))))
           (cadr KeyCmdAlist)))))
 
+(defmacro xah-fly--define-command-keys (KeymapName KeyCmdAlist &optional DirectQ)
+  "Map `define-key' over a alist KeyCmdAlist, with key layout
+remap, plus adding the hyper modifier that gets attached to
+keypresses happening during command mode.  See also
+`xah-fly--define-keys'.  Version: 2022-02-19"
+  (let (($keymapName (make-symbol "keymap-name")))
+    `(let ((,$keymapName , KeymapName))
+       ,@(mapcar
+          (lambda ($pair)
+            `(define-key
+               ,$keymapName
+               (kbd (concat "H-" (,(if DirectQ #'identity #'xah-fly--key-char) ,(car $pair))))
+               ,(list 'quote (cdr $pair))))
+          (cadr KeyCmdAlist)))))
+
 ;; HHH___________________________________________________________________
 ;; keymaps
-
-(defvar xah-fly-key-map (make-sparse-keymap)
-  "Backward-compatibility map for `xah-fly-keys' minor mode.
-If `xah-fly-insert-state-p' is true, point to `xah-fly-insert-map', else, point to points to `xah-fly-command-map'.")
-
-(make-obsolete-variable
- 'xah-fly-key-map
- "Put bindings for command mode in `xah-fly-command-map', bindings for
-insert mode in `xah-fly-insert-map' and bindings that are common to both
-command and insert modes in `xah-fly-shared-map'."
- "2020-04-16")
 
 (defvar xah-fly-shared-map (make-sparse-keymap)
   "Parent keymap of `xah-fly-command-map' and `xah-fly-insert-map'.
@@ -3621,12 +3652,10 @@ by this map.
 Keep in mind that this acts like a normal global minor mode map, so other
 minor modes loaded later may override bindings in this map.")
 
-(defvar xah-fly--deactivate-command-mode-func nil)
-
 ;; HHH___________________________________________________________________
 ;; setting keys
 
-(xah-fly--define-keys
+(xah-fly--define-command-keys
  xah-fly-command-map
  '(
    ("~" . nil)
@@ -4323,11 +4352,6 @@ minor modes loaded later may override bindings in this map.")
 
 (defvar xah-fly-insert-state-p t "non-nil means insertion mode is on.")
 
-(defun xah-fly--update-key-map ()
-  (setq xah-fly-key-map (if xah-fly-insert-state-p
-                            xah-fly-insert-map
-                          xah-fly-command-map)))
-
 (defun xah-fly-keys-set-layout (Layout)
   "Set a keyboard layout.
 Argument must be one of:
@@ -4372,9 +4396,6 @@ Version: 2021-05-19 2021-09-17"
 Version: 2020-04-28"
   (interactive)
   (setq xah-fly-insert-state-p nil)
-  (xah-fly--update-key-map)
-  (setq xah-fly--deactivate-command-mode-func
-        (set-transient-map xah-fly-command-map (lambda () t)))
   (modify-all-frames-parameters (list (cons 'cursor-type 'box)))
   ;; (set-face-background 'cursor "red")
   (setq mode-line-front-space xah-fly-command-mode-indicator)
@@ -4393,8 +4414,6 @@ Version: 2018-05-07"
   "Enter insertion mode."
   (interactive)
   (setq xah-fly-insert-state-p t)
-  (xah-fly--update-key-map)
-  (funcall xah-fly--deactivate-command-mode-func)
   (unless no-indication
     (modify-all-frames-parameters '((cursor-type . bar)))
     ;; (set-face-background 'cursor "black")
@@ -4453,6 +4472,56 @@ Version: 2017-07-07"
   (xah-fly-insert-mode-activate)
   (left-char))
 
+(defun xah-fly-hyperify (prompt)
+  "When in command mode, add a hyper modifier to the leading
+event in a keyboard event sequence, if that yields a valid
+binding."
+  (let* ((v (this-command-keys-vector))
+         (len (length v))
+         (ev1 (aref v (1- len)))
+         (ev1v (vector ev1)))
+    (if (or xah-fly-insert-state-p (/= 1 len))
+        ev1v
+      (let ((ev1mod (event-modifiers ev1))
+             (ev1base (event-basic-type ev1)))
+        (if (memq 'hyper ev1mod)
+            ev1v
+          (let ((ev1v-hyper (vector
+                           (event-convert-list
+                            (nconc (cons 'hyper ev1mod)
+                                   (cons ev1base nil))))))
+            (if (key-binding ev1v-hyper)
+                ev1v-hyper
+              ev1v)))))))
+
+(defvar xah-fly-translated-keys
+  '("`" "1" "2" "3" "4" "5" "6" "7" "8" "9" "0" "[" "]" "DEL"
+    "TAB" "'" "," "." "p" "y" "f" "g" "c" "r" "l" "/" "=" "\\"
+    "a" "o" "e" "u" "i" "d" "h" "t" "n" "s" "-" "RET"
+    ";" "q" "j" "k" "x" "b" "m" "w" "v" "z"
+    "SPC" )
+  "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode.
+See `xah-fly-hyperify'.  These are translated to the current
+keyboard layout using `xah-fly--key-char'.")
+  
+(defvar xah-fly-translation-map
+  (cons 'keymap (mapcar (lambda (key)
+                          (cons (car (listify-key-sequence
+                                      (kbd (xah-fly--key-char key))))
+                                'xah-fly-hyperify))
+                        xah-fly-translated-keys))
+  "Keymap added to key-translation-map to mark initial event of
+key sequences entered during command mode with hyper modifier.")
+
+(defun xah-fly-keymap-inject (receiver-kmap addon)
+  "Inject `addon' keymap at first position of `receiver-kmap'."
+  (delq addon receiver-kmap)
+  (setcdr receiver-kmap (cons addon (cdr receiver-kmap))))
+
+(defun xah-fly-keymap-uninject (receiver-kmap addon)
+  "Remove `addon' keymap from `receiver-kmap'."
+  (delq addon receiver-kmap))
+
 ;; HHH___________________________________________________________________
 
 (define-minor-mode xah-fly-keys
@@ -4472,14 +4541,19 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
         (add-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
         (add-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
         (add-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
-        (when (and (keymapp xah-fly-key-map)
-                   (not (memq xah-fly-key-map (list xah-fly-command-map
-                                                    xah-fly-insert-map))))
-          (set-keymap-parent xah-fly-key-map xah-fly-shared-map)
-          (setq xah-fly-shared-map xah-fly-key-map))
+        (xah-fly-keymap-inject key-translation-map xah-fly-translation-map)
+        (xah-fly-keymap-inject text-mode-map xah-fly-command-map)
+        (xah-fly-keymap-inject prog-mode-map xah-fly-command-map)
+        (xah-fly-keymap-inject special-mode-map xah-fly-command-map)
+        (xah-fly-keymap-inject minibuffer-local-map xah-fly-command-map)
         (xah-fly-command-mode-activate))
     (progn
       ;; Teardown:
+      (xah-fly-keymap-uninject key-translation-map xah-fly-translation-map)
+      (xah-fly-keymap-uninject text-mode-map xah-fly-command-map)
+      (xah-fly-keymap-uninject prog-mode-map xah-fly-command-map)      
+      (xah-fly-keymap-uninject special-mode-map xah-fly-command-map)
+      (xah-fly-keymap-uninject minibuffer-local-map xah-fly-command-map)
       (remove-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
       (remove-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
       (remove-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
