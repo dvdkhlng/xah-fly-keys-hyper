@@ -4472,27 +4472,30 @@ Version: 2017-07-07"
   (xah-fly-insert-mode-activate)
   (left-char))
 
-(defun xah-fly-hyperify (prompt)
+(defun xah-fly-add-hyper (ev)
+  "Modify keyboard event adding hyper modifier.
+Example: (xah-fly-add-hyper (car (listify-key-sequence (kbd \"a\"))))."
+  (let ((evmod (event-modifiers ev))
+        (evbase (event-basic-type ev)))
+    (if (memq 'hyper evmod)
+        ev
+      (event-convert-list
+       (append '(hyper) evmod (list evbase))))))
+    
+(defun xah-fly-hyperify (key hyper-key)
   "When in command mode, add a hyper modifier to the leading
 event in a keyboard event sequence, if that yields a valid
 binding."
-  (let* ((v (this-command-keys-vector))
-         (len (length v))
-         (ev1 (aref v (1- len)))
-         (ev1v (vector ev1)))
-    (if (or xah-fly-insert-state-p (/= 1 len))
-        ev1v
-      (let ((ev1mod (event-modifiers ev1))
-             (ev1base (event-basic-type ev1)))
-        (if (memq 'hyper ev1mod)
-            ev1v
-          (let ((ev1v-hyper (vector
-                           (event-convert-list
-                            (nconc (cons 'hyper ev1mod)
-                                   (cons ev1base nil))))))
-            (if (key-binding ev1v-hyper)
-                ev1v-hyper
-              ev1v)))))))
+  ;; Ouch: (this-command-keys-vector)&friends fails to give the full input
+  ;; sequence here, when the DEL key is hit, probably due to the translation
+  ;; from 'backspace happening in input-decode-map).  For now we work around
+  ;; the issue by querying this-single-command-raw-keys instead.  Does this
+  ;; work in all circumstances, even on a terminal!?
+  (if (or xah-fly-insert-state-p
+          (/= 1 (length (this-single-command-raw-keys)))
+          (not (key-binding (vector hyper-key))))
+      (vector key)
+    (vector hyper-key)))
 
 (defvar xah-fly-translated-keys
   '("`" "1" "2" "3" "4" "5" "6" "7" "8" "9" "0" "[" "]" "DEL"
@@ -4502,13 +4505,19 @@ binding."
     "SPC" )
   "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode.
 See `xah-fly-hyperify'.  These are translated to the current
-keyboard layout using `xah-fly--key-char'.")
-  
+keyboard layout using `xah-fly--key-char'.
+
+Note: Emacs 27 seems to have problems with key translation of sequences containing DEL.  This is why we do not add any
+")
+
 (defvar xah-fly-translation-map
-  (cons 'keymap (mapcar (lambda (key)
-                          (cons (car (listify-key-sequence
-                                      (kbd (xah-fly--key-char key))))
-                                'xah-fly-hyperify))
+  (cons 'keymap (mapcar (lambda (keystr)
+                          (let* ((key (car (listify-key-sequence
+                                            (kbd (xah-fly--key-char keystr)))))
+                                 (hyper-key (xah-fly-add-hyper key)))
+                            (cons
+                             key
+                             (lambda (prompt) (xah-fly-hyperify key hyper-key)))))
                         xah-fly-translated-keys))
   "Keymap added to key-translation-map to mark initial event of
 key sequences entered during command mode with hyper modifier.")
@@ -4587,3 +4596,4 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
 (provide 'xah-fly-keys)
 
 ;;; xah-fly-keys.el ends here
+
