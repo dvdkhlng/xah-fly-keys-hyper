@@ -4514,13 +4514,26 @@ keyboard layout using `xah-fly--key-char'.")
 key sequences entered during command mode with hyper modifier.")
 
 (defun xah-fly-keymap-inject (receiver-kmap addon)
-  "Inject `addon' keymap at first position of `receiver-kmap'."
-  (delq addon receiver-kmap)
-  (setcdr receiver-kmap (cons addon (cdr receiver-kmap))))
+  "Inject `addon' keymap at first position of `receiver-kmap'.
+Then put a second empty keymap in front so that `define-key' does
+not end up writing to our injected keymap that's usually shared
+between many places."
+  (unless (memq addon receiver-kmap)
+    (setcdr receiver-kmap (cons (cons 'keymap nil)
+                                (cons addon (cdr receiver-kmap))))))
 
 (defun xah-fly-keymap-uninject (receiver-kmap addon)
   "Remove `addon' keymap from `receiver-kmap'."
-  (delq addon receiver-kmap))
+  (delq addon receiver-kmap)
+  ;; remove the first empty (keymap) we find, as we added one in
+  ;; xah-fly-keymap-inject
+  (let ((empty-kmaps (mapcan (lambda (x)
+                               (and (consp x) (eq (car x) 'keymap)
+                                    (eq (cdr x) nil)
+                                    (list x)))
+                             receiver-kmap)))
+    (if empty-kmaps (delq (car empty-kmaps) receiver-kmap))))
+
 
 ;; HHH___________________________________________________________________
 
