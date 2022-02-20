@@ -4540,6 +4540,7 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
       (progn
         (add-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
         (add-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
+        (add-hook 'isearch-mode-hook 'xah-fly-insert-mode-activate)
         (add-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
         (xah-fly-keymap-inject key-translation-map xah-fly-translation-map)
         (xah-fly-keymap-inject text-mode-map xah-fly-command-map)
@@ -4556,6 +4557,7 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
       (xah-fly-keymap-uninject minibuffer-local-map xah-fly-command-map)
       (remove-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
       (remove-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
+      (remove-hook 'isearch-mode-hook 'xah-fly-insert-mode-activate)      
       (remove-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
       (remove-hook 'eshell-mode-hook 'xah-fly-insert-mode-activate)
       (remove-hook 'shell-mode-hook 'xah-fly-insert-mode-activate)
