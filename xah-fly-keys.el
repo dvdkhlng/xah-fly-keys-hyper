@@ -4510,6 +4510,9 @@ keyboard layout using `xah-fly--key-char'.
 Note: Emacs 27 seems to have problems with key translation of sequences containing DEL.  This is why we do not add any
 ")
 
+;; todo: for exwm to work, we may need to advice
+;; exwm-input--event-passthrough-p to pass through any events that would have
+;; a valid binding, when hyper were set (in command mode)
 (defvar xah-fly-translation-map
   (cons 'keymap (mapcar (lambda (keystr)
                           (let* ((key (car (listify-key-sequence
@@ -4565,22 +4568,12 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
         (add-hook 'isearch-mode-hook 'xah-fly-insert-mode-activate)
         (add-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
         (xah-fly-keymap-inject key-translation-map xah-fly-translation-map)
-        (xah-fly-keymap-inject minibuffer-local-map xah-fly-command-map)
-        ;; todo: maybe better to use eval-after-load instead
-        (require 'text-mode)
-        (require 'prog-mode)
-        (require 'simple)
-        (xah-fly-keymap-inject text-mode-map xah-fly-command-map)
-        (xah-fly-keymap-inject prog-mode-map xah-fly-command-map)
-        (xah-fly-keymap-inject special-mode-map xah-fly-command-map)
+        (xah-fly-keymap-inject global-map xah-fly-command-map)
         (xah-fly-command-mode-activate))
     (progn
       ;; Teardown:
       (xah-fly-keymap-uninject key-translation-map xah-fly-translation-map)
-      (xah-fly-keymap-uninject text-mode-map xah-fly-command-map)
-      (xah-fly-keymap-uninject prog-mode-map xah-fly-command-map)      
-      (xah-fly-keymap-uninject special-mode-map xah-fly-command-map)
-      (xah-fly-keymap-uninject minibuffer-local-map xah-fly-command-map)
+      (xah-fly-keymap-uninject global-map xah-fly-command-map)
       (remove-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
       (remove-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
       (remove-hook 'isearch-mode-hook 'xah-fly-insert-mode-activate)      
