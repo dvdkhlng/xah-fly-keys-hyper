@@ -4214,6 +4214,12 @@ minor modes loaded later may override bindings in this map.")
  '(("h" . indent-rigidly-left)
    ("n" . indent-rigidly-right)))
 
+;; These also need to work in command mode. 
+(xah-fly--define-command-keys
+ indent-rigidly-map
+ '(("h" . indent-rigidly-left)
+   ("n" . indent-rigidly-right)))
+
 ;; HHH___________________________________________________________________
 ;;;; misc
 
