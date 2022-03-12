@@ -4220,6 +4220,23 @@ minor modes loaded later may override bindings in this map.")
  '(("h" . indent-rigidly-left)
    ("n" . indent-rigidly-right)))
 
+;;; Fixes to allow "universal-argument" to work with Hyper- modifier present
+;; Todo: need to support keypad as well?
+(with-eval-after-load 'simple
+  (let ((map universal-argument-map))
+    (define-key map [?\H-0] 'digit-argument)
+    (define-key map [?\H-1] 'digit-argument)
+    (define-key map [?\H-2] 'digit-argument)
+    (define-key map [?\H-3] 'digit-argument)
+    (define-key map [?\H-4] 'digit-argument)
+    (define-key map [?\H-5] 'digit-argument)
+    (define-key map [?\H-6] 'digit-argument)
+    (define-key map [?\H-7] 'digit-argument)
+    (define-key map [?\H-8] 'digit-argument)
+    (define-key map [?\H-9] 'digit-argument)
+    (define-key map [?\H--] 'negative-argument)
+    ))
+
 ;; HHH___________________________________________________________________
 ;;;; misc
 
