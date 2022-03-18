@@ -3722,8 +3722,7 @@ minor modes loaded later may override bindings in this map.")
 
 (xah-fly--define-keys
  xah-fly-shared-map
- '(("<home>" . xah-fly-command-mode-activate)
-   ("<menu>" . xah-fly-command-mode-activate)
+ '(("<menu>" . xah-fly-command-mode-activate)
    ("<f8>" . xah-fly-command-mode-activate))
  :direct)
 
@@ -4504,8 +4503,8 @@ Example: (xah-fly-add-hyper (car (listify-key-sequence (kbd \"a\"))))."
         ev
       (event-convert-list
        (append '(hyper) evmod (list evbase))))))
-    
-(defun xah-fly-hyperify (key hyper-key)
+
+(defun xah-fly-translate-key (key command-mode-key)
   "When in command mode, add a hyper modifier to the leading
 event in a keyboard event sequence, if that yields a valid
 binding."
@@ -4516,36 +4515,90 @@ binding."
   ;; work in all circumstances, even on a terminal!?
   (if (or xah-fly-insert-state-p
           (/= 1 (length (this-single-command-raw-keys)))
-          (not (key-binding (vector hyper-key))))
+          ;;(not (key-binding (vector hyper-key)))
+          )
       (vector key)
-    (vector hyper-key)))
+    (vector command-mode-key)))
 
-(defvar xah-fly-translated-keys
-  '("`" "1" "2" "3" "4" "5" "6" "7" "8" "9" "0" "[" "]" "DEL"
-    "TAB" "'" "," "." "p" "y" "f" "g" "c" "r" "l" "/" "=" "\\"
-    "a" "o" "e" "u" "i" "d" "h" "t" "n" "s" "-" "RET"
-    ";" "q" "j" "k" "x" "b" "m" "w" "v" "z"
-    "SPC" )
+(defvar xah-fly-hyperify-keys
+  '("`" "1" "2" "3" "4"
+    ;;"5"
+    "6" "7" "8" "9" "0" "[" "]" 
+    ;;"TAB"
+    "'" "," "." "p" "y" "f" "g"
+    ;;"c"
+    "r" "l" "/" "=" "\\"
+    "a" "o"
+    ;;"e"
+    "u" "i"
+    ;;"d" "h" "t" "n" "s"
+    "-"
+    ;;"RET"
+    ";" "q" "j" "k" "x" "b"
+    ;;"m"
+    "w"
+    ;;"v"
+    "z" 
+    "SPC"
+    ;; also hyperify those keys that we synthesize from other keys when insert
+    ;; mode is one.  This allows us to always tell those apart and assign
+    ;; distinct actions
+;    "DEL" "<backspace>"
+    "<left>" "<right>" "<up>" "<down>" "<home>" "<end>"
+    )
   "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode.
 See `xah-fly-hyperify'.  These are translated to the current
 keyboard layout using `xah-fly--key-char'.
-
-Note: Emacs 27 seems to have problems with key translation of sequences containing DEL.  This is why we do not add any
 ")
 
-;; todo: for exwm to work, we may need to advice
-;; exwm-input--event-passthrough-p to pass through any events that would have
-;; a valid binding, when hyper were set (in command mode)
+(defvar xah-fly-replace-keys
+  '(("5" . "<deletechar>")
+    ("c" . "<up>")
+    ("h" . "<left>")
+    ("n" . "<right>")
+    ("t" . "<down>")
+    ("d" . "<home>")
+    ("s" . "<end>")
+    ("m" . "<prior>")
+    ("v" . "<next>")
+    ("e" . "DEL"))
+  "Association list describing key substitutions performed when
+command mode enabled."
+  )
+
 (defvar xah-fly-translation-map
-  (cons 'keymap (mapcar (lambda (keystr)
-                          (let* ((key (car (listify-key-sequence
-                                            (kbd (xah-fly--key-char keystr)))))
-                                 (hyper-key (xah-fly-add-hyper key)))
-                            (cons
-                             key
-                             (lambda (prompt) (xah-fly-hyperify key hyper-key)))))
-                        xah-fly-translated-keys))
-  "Keymap added to key-translation-map to mark initial event of
+  (append '(keymap)
+          ;; Always translate backspace to H-DEL, so that we can use the real
+          ;; backspace as command mode activation key, while Dvorak-E is
+          ;; translated to DEL and performs deletion normally.
+          '((backspace . [16777343])
+            ;; DEL
+            (?\d . [16777343]))
+          ;; Keys that get translated to Hyper-<Key> when command mode active
+          (mapcar (lambda (keystr)
+                    (let* ((key (car (listify-key-sequence
+                                      (kbd (xah-fly--key-char keystr)))))
+                           (hyper-key (xah-fly-add-hyper key)))
+                      (cons
+                       key
+                       (lambda (prompt) (xah-fly-translate-key key hyper-key)))))
+                  xah-fly-hyperify-keys)
+          ;; Keys that get translated to various function keys when command
+          ;; mode active
+          (mapcar (lambda (assoc)
+                    (let* ((keystr (car assoc))
+                           (replstr (cdr assoc))
+                           (key (car (listify-key-sequence
+                                      (kbd (xah-fly--key-char keystr)))))
+                           (repl (car (listify-key-sequence
+                                      (kbd (xah-fly--key-char replstr))))))
+                      (cons
+                       key
+                       (lambda (prompt) (xah-fly-translate-key key repl)))))
+                  xah-fly-replace-keys)
+          )
+  
+   "Keymap added to key-translation-map to mark initial event of
 key sequences entered during command mode with hyper modifier.")
 
 (defun xah-fly-keymap-inject (receiver-kmap addon)
