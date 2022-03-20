@@ -248,6 +248,31 @@ Version: 2018-06-04 2021-03-16"
           (when (eq $p (point))
             (beginning-of-line)))))))
 
+(defun xah-beginning-of-line ()
+  "Same as `beginning-of-line' but with repeat map."
+  (interactive) (beginning-of-line))
+(defun xah-end-of-line ()
+  "Same as `end-of-line' but with repeat map."
+  (interactive) (end-of-line))
+(defun xah-backward-paragraph ()
+  "Same as `backward-paragraph' but with repeat map."
+  (interactive) (backward-paragraph))
+(defun xah-forward-paragraph ()
+  "Same as `forward-paragraph' but with repeat map."
+  (interactive) (forward-paragraph))
+
+(defvar xah-bol-repeat-map (make-sparse-keymap)
+  "Keymap to do beginning of line navigation.  Used in
+ `repeat-mode'.")
+(defvar xah-eol-repeat-map (make-sparse-keymap)
+  "Keymap to do end of line navigation.  Used in
+ `repeat-mode'.")
+
+(put 'xah-beginning-of-line 'repeat-map 'xah-bol-repeat-map)
+(put 'xah-backward-paragraph 'repeat-map 'xah-bol-repeat-map)
+(put 'xah-end-of-line 'repeat-map 'xah-eol-repeat-map)
+(put 'xah-forward-paragraph 'repeat-map 'xah-eol-repeat-map)
+
 (defun xah-end-of-line-or-block ()
   "Move cursor to end of line or next block.
 
@@ -3717,6 +3742,18 @@ minor modes loaded later may override bindings in this map.")
    ("y" . set-mark-command)
    ("z" . xah-goto-matching-bracket)))
 
+(xah-fly--define-keys
+ xah-fly-command-map
+ '(
+   ("<home>" . xah-beginning-of-line)
+   ("<end>" . xah-end-of-line)))
+(xah-fly--define-keys
+ xah-bol-repeat-map
+ '(("<home>" . xah-backward-paragraph)))
+(xah-fly--define-keys
+ xah-eol-repeat-map
+ '(("<end>" . xah-forward-paragraph)))
+
 ;; HHH___________________________________________________________________
 ;; set control meta, etc keys
 
@@ -4639,6 +4676,7 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
   (if xah-fly-keys
       ;; Construction:
       (progn
+        (repeat-mode)
         (add-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
         (add-hook 'minibuffer-exit-hook 'xah-fly-command-mode-activate)
         (add-hook 'isearch-mode-hook 'xah-fly-insert-mode-activate)
@@ -4648,6 +4686,7 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
         (xah-fly-command-mode-activate))
     (progn
       ;; Teardown:
+      ;; todo: need to restore repeat-mode state!?
       (xah-fly-keymap-uninject key-translation-map xah-fly-translation-map)
       (xah-fly-keymap-uninject global-map xah-fly-command-map)
       (remove-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
