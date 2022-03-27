@@ -4541,21 +4541,42 @@ Example: (xah-fly-add-hyper (car (listify-key-sequence (kbd \"a\"))))."
       (event-convert-list
        (append '(hyper) evmod (list evbase))))))
 
-(defun xah-fly-translate-key (key command-mode-key)
-  "When in command mode, add a hyper modifier to the leading
-event in a keyboard event sequence, if that yields a valid
-binding."
+(defvar xah-fly-last-translation '(nil . nil)
+  "Track last substitution of `xah-fly-translate-key' so we can undo
+it in `unread-command-events'.")
+
+(defun xah-fly-unread-commands-watcher (symbol newval op where)
+  "Watcher installed via `add-variable-watcher' to watch
+`unread-command-events' and undo our input translations if events
+we translated already get pushed there."
+  ;; (message "watch: %S, VAL: %S, OP: %S, WHERE: %S" symbol newval op where)
+  (when (and (listp newval) (equal (car newval) (cdr xah-fly-last-translation)))
+    (message "undo translate: %s->%s" newval (car xah-fly-last-translation))
+    (setcar newval (car xah-fly-last-translation))))
+
+(defun xah-fly-translate-key (key command-mode-key &optional insert-mode-key)
+  "Perform input event translation for KEY when it appears as first event in a command sequence.
+Note how some emacs packages push back to
+`unread-command-events'.  This is a problem, as events in
+`unread-command-events' will undergo input translation
+again (example: `vhdl-mode', `mozc-mode').  We workaraond the
+issue by remembering the last translation done here and undoing
+it in `xah-fly-unread-commands-watcher'.
+"
   ;; Ouch: (this-command-keys-vector)&friends fails to give the full input
   ;; sequence here, when the DEL key is hit, probably due to the translation
   ;; from 'backspace happening in input-decode-map).  For now we work around
   ;; the issue by querying this-single-command-raw-keys instead.  Does this
   ;; work in all circumstances, even on a terminal!?
-  (if (or xah-fly-insert-state-p
-          (/= 1 (length (this-single-command-raw-keys)))
-          ;;(not (key-binding (vector hyper-key)))
-          )
-      (vector key)
-    (vector command-mode-key)))
+  ;; (message "translate unread (%i,+%i) %s" (length (this-single-command-raw-keys)) (length (this-command-keys)) unread-command-events)
+  (let ((xlate 
+         (if (= 1 (length (this-single-command-raw-keys)))
+             (if xah-fly-insert-state-p
+                 (or insert-mode-key key)
+               command-mode-key)
+            key)))
+    (setq xah-fly-last-translation (cons key xlate))
+    (vector xlate)))
 
 (defvar xah-fly-hyperify-keys
   '("`" "1" "2" "3" "4"
@@ -4577,14 +4598,16 @@ binding."
     ;;"v"
     "z" 
     "SPC"
-    ;; also hyperify those keys that we synthesize from other keys when insert
-    ;; mode is one.  This allows us to always tell those apart and assign
-    ;; distinct actions
+    ;; Also hyperify those keys that we synthesize from other keys in command
+    ;; mode.  This allows us to always tell those apart and assign distinct
+    ;; actions.  Note that DEL is translated unconditionally, though (both in
+    ;; insert and command mode) via a separate entry in key-translation-map,
+    ;; so that we can use it as a command mode activator key)
 ;    "DEL" "<backspace>"
     "<left>" "<right>" "<up>" "<down>" "<home>" "<end>"
     )
-  "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode.
-See `xah-fly-hyperify'.  These are translated to the current
+  "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode, when used as first key in a command sequence.
+See `xah-fly-hyperify-keys'.  These are translated to the current
 keyboard layout using `xah-fly--key-char'.
 ")
 
@@ -4607,10 +4630,12 @@ command mode enabled."
   (append '(keymap)
           ;; Always translate backspace to H-DEL, so that we can use the real
           ;; backspace as command mode activation key, while Dvorak-E is
-          ;; translated to DEL and performs deletion normally.
-          '((backspace . [16777343])
+          ;; translated to DEL and performs deletion normally.  Note that we
+          ;; still only translate DEL at the start of a key sequence, to not
+          ;; break commands such as "B DEL" in GNUS.
+          '((backspace . (lambda (prompt) (xah-fly-translate-key 'backspace ?\H-\d ?\H-\d)))
             ;; DEL
-            (?\d . [16777343]))
+            (?\d . (lambda (prompt) (xah-fly-translate-key ?\d ?\H-\d ?\H-\d))))
           ;; Keys that get translated to Hyper-<Key> when command mode active
           (mapcar (lambda (keystr)
                     (let* ((key (car (listify-key-sequence
@@ -4635,8 +4660,8 @@ command mode enabled."
                   xah-fly-replace-keys)
           )
   
-   "Keymap added to key-translation-map to mark initial event of
-key sequences entered during command mode with hyper modifier.")
+   "Keymap added to `key-translation-map' to modify key events in
+   command mode.")
 
 (defun xah-fly-keymap-inject (receiver-kmap addon)
   "Inject `addon' keymap at first position of `receiver-kmap'.
@@ -4683,10 +4708,12 @@ URL `http://xahlee.info/emacs/misc/ergoemacs_vi_mode.html'"
         (add-hook 'isearch-mode-end-hook 'xah-fly-command-mode-activate)
         (xah-fly-keymap-inject key-translation-map xah-fly-translation-map)
         (xah-fly-keymap-inject global-map xah-fly-command-map)
+        (add-variable-watcher 'unread-command-events #'xah-fly-unread-commands-watcher)
         (xah-fly-command-mode-activate))
     (progn
       ;; Teardown:
       ;; todo: need to restore repeat-mode state!?
+      (remove-variable-watcher 'unread-command-events #'xah-fly-unread-commands-watcher)
       (xah-fly-keymap-uninject key-translation-map xah-fly-translation-map)
       (xah-fly-keymap-uninject global-map xah-fly-command-map)
       (remove-hook 'minibuffer-setup-hook 'xah-fly-insert-mode-activate)
