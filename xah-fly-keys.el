@@ -4554,6 +4554,7 @@ we translated already get pushed there."
     (message "undo translate: %s->%s" newval (car xah-fly-last-translation))
     (setcar newval (car xah-fly-last-translation))))
 
+;; Todo: prevent translation of numeric input in universal-argument--mode.
 (defun xah-fly-translate-key (key command-mode-key &optional insert-mode-key)
   "Perform input event translation for KEY when it appears as first event in a command sequence.
 Note how some emacs packages push back to
@@ -4581,7 +4582,9 @@ it in `xah-fly-unread-commands-watcher'.
 (defvar xah-fly-hyperify-keys
   '("`" "1" "2" "3" "4"
     ;;"5"
-    "6" "7" "8" "9" "0" "[" "]" 
+    "6" "7" "8"
+    ;; "9"
+    "0" "[" "]" 
     ;;"TAB"
     "'" "," "." "p" "y" "f" "g"
     ;;"c"
@@ -4604,15 +4607,33 @@ it in `xah-fly-unread-commands-watcher'.
     ;; insert and command mode) via a separate entry in key-translation-map,
     ;; so that we can use it as a command mode activator key)
 ;    "DEL" "<backspace>"
-    "<left>" "<right>" "<up>" "<down>" "<home>" "<end>"
+    ;; "<left>" "<right>" "<up>" "<down>" "<home>" "<end>"
     )
   "List of keys on a Dovrak  keyboard to be prefixed with Hyper modifier in command mode, when used as first key in a command sequence.
 See `xah-fly-hyperify-keys'.  These are translated to the current
 keyboard layout using `xah-fly--key-char'.
 ")
 
+(defvar xah-fly-always-hyperify-keys
+  '(
+    "<left>" "<right>" "<up>" "<down>"
+    "<home>" "<end>" "<prior>" "<next>"
+    "<backspace>" "DEL" "TAB"
+    "<deletechar>"
+    )
+  "List of keys on a Dovrak keyboard to be always modified with
+ Hyper modifier in both command and insert mode. See
+ `xah-fly-hyperify-keys'.  These are translated to the current
+ keyboard layout using `xah-fly--key-char'.  The keys listed here
+ are available in command mode via `xah-fly-replace-keys', making
+ the original keys appear as different helps us to assign the
+ physical keyboard keys different roles (such as switching to
+ command mode on H-DEL).
+")
+
 (defvar xah-fly-replace-keys
   '(("5" . "<deletechar>")
+    ("9" . "TAB")
     ("c" . "<up>")
     ("h" . "<left>")
     ("n" . "<right>")
@@ -4633,9 +4654,14 @@ command mode enabled."
           ;; translated to DEL and performs deletion normally.  Note that we
           ;; still only translate DEL at the start of a key sequence, to not
           ;; break commands such as "B DEL" in GNUS.
-          '((backspace . (lambda (prompt) (xah-fly-translate-key 'backspace ?\H-\d ?\H-\d)))
-            ;; DEL
-            (?\d . (lambda (prompt) (xah-fly-translate-key ?\d ?\H-\d ?\H-\d))))
+          (mapcar (lambda (keystr)
+                    (let* ((key (car (listify-key-sequence
+                                      (kbd (xah-fly--key-char keystr)))))
+                           (hyper-key (xah-fly-add-hyper key)))
+                      (cons
+                       key
+                       (lambda (prompt) (xah-fly-translate-key key hyper-key hyper-key)))))
+                  xah-fly-always-hyperify-keys)
           ;; Keys that get translated to Hyper-<Key> when command mode active
           (mapcar (lambda (keystr)
                     (let* ((key (car (listify-key-sequence
