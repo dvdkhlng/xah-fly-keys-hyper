@@ -4580,10 +4580,12 @@ it in `xah-fly-unread-commands-watcher'.
     (vector xlate)))
 
 (defvar xah-fly-hyperify-keys
-  '("`" "1" "2" "3" "4"
+  '("`" "1"
+    ;;"2"
+    "3" "4"
     ;;"5"
     "6" "7" "8"
-    ;; "9"
+    "9"
     "0" "[" "]" 
     ;;"TAB"
     "'" "," "." "p" "y" "f" "g"
@@ -4633,7 +4635,7 @@ keyboard layout using `xah-fly--key-char'.
 
 (defvar xah-fly-replace-keys
   '(("5" . "<deletechar>")
-    ("9" . "TAB")
+    ("2" . "TAB")
     ("c" . "<up>")
     ("h" . "<left>")
     ("n" . "<right>")
