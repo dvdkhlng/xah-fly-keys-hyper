@@ -2737,7 +2737,7 @@ Version: 2017-01-27"
       (other-frame 1)
     (if (one-window-p)
         (other-frame 1)
-      (other-window 1))))
+      (select-window (next-window (selected-window))))))
 
 (defun xah-unsplit-window-or-next-frame ()
   "Unsplit window. If current frame has only one window, switch to next frame.
